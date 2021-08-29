@@ -152,29 +152,29 @@ def multi_plotter(spot_range=20, spot=100,
         plt.axvline(x=spot, color='r', linestyle='--', label='spot price')
         plt.tight_layout()
         output_file("toolbar.html")
-        if save==True:
-            plt.savefig(file)
-        plt.show()
+        # if save==True:
+        #     plt.savefig(file)
+        # plt.show()
 
 
         # # Save it to a temporary buffer.
-        # buf = BytesIO()
-        # plt.savefig(buf, format="png")
-        # # Embed the result in the html output.
-        # data = base64.b64encode(buf.getbuffer()).decode("ascii")
-        # return f"<img src='data:image/png;base64,{data}'/>"
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        # Embed the result in the html output.
+        data = base64.b64encode(buf.getbuffer()).decode("ascii")
+        return f"<img src='data:image/png;base64,{data}'/>"
 
-        # def create_figure():
-        #     fig = Figure()
-        #     axis = fig.add_subplot(1, 1, 1)
-        #     xs = range(100)
-        #     ys = [random.randint(1, 50) for x in xs]
-        #     axis.plot(xs, ys)
-        #     return fig
-        # fig = create_figure()
-        # output = io.BytesIO()
-        # FigureCanvas(fig).print_png(output)
-        # return Response(output.getvalue(), mimetype='image/png')
+        def create_figure():
+            fig = Figure()
+            axis = fig.add_subplot(1, 1, 1)
+            xs = range(100)
+            ys = [random.randint(1, 50) for x in xs]
+            axis.plot(xs, ys)
+            return fig
+        fig = create_figure()
+        output = io.BytesIO()
+        FigureCanvas(fig).print_png(output)
+        return Response(output.getvalue(), mimetype='image/png')
 
 
     return plotter()   
