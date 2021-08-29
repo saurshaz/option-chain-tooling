@@ -4,21 +4,25 @@ import base64
 import io
 from io import BytesIO
 import json
-import opstrat as op
 from flask_cors import CORS
 from jugaad_data.nse import NSELive
-from bokeh.plotting import ColumnDataSource, figure, output_file, show
 
 import random
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-# n = NSELive()
-  
+
+from matplotlib.patches import Ellipse
+from matplotlib.text import OffsetFrom
+n = NSELive()
+import matplotlib.pyplot as plt
+import xml.etree.ElementTree as ET
+from io import BytesIO
+
+import mplcursors
+from pandas import DataFrame
 
 def check_optype(op_type):
     if (op_type not in ['p','c']):
@@ -151,10 +155,20 @@ def multi_plotter(spot_range=20, spot=100,
         plt.axhline(color='k', linestyle='--')
         plt.axvline(x=spot, color='r', linestyle='--', label='spot price')
         plt.tight_layout()
-        output_file("toolbar.html")
+        # output_file("toolbar.html")
         # if save==True:
         #     plt.savefig(file)
         # plt.show()
+
+
+        #  {
+        # "Change": -6.24,
+        # "Final": 1172.0,
+        # "StockPrice": 15663.0,
+        # "Today": 1162.8,
+        # "bes": 0.0
+        # },
+
 
 
         # # Save it to a temporary buffer.
@@ -236,14 +250,129 @@ def sym_price():
         oc[option['strikePrice']] = {'CE': option['CE'], 'PE': option['PE']}
     return jsonify(oc)
 
+@app.route('/api/c', methods=['POST','GET'])
+def chart():
+    c = request.json
+    # print(c['spot'])
+    # return multi_plotter(spot=c['spot'],spot_range=10, op_list=c['legs'])
+    interactive = c.get('interactive') or False
+    verbose=c.get('all') or False
+    spot_range=20
+    spot=c['spot'] or 16500
+    op_list=c['legs'] or [{'op_type':'c','strike':110,'tr_type':'s','op_pr':2,'contract':1}, {'op_type':'p','strike':95,'tr_type':'s','op_pr':6,'contract':1}]
+    save=False
+    file='fig.png'
+    x=spot*np.arange(100-spot_range,101+spot_range,0.01)/100
+    y0=np.zeros_like(x)         
+    
+    y_list=[]
+    for op in op_list:
+        op_type=str.lower(op['op_type'])
+        tr_type=str.lower(op['tr_type'])
+        check_optype(op_type)
+        check_trtype(tr_type)
+        
+        strike=op['strike']
+        op_pr=op['op_pr']
+        try:
+            contract=op['contract']
+        except:
+            contract=1
+        y_list.append(payoff_calculator(x, op_type, strike, op_pr, tr_type, contract))
+    
 
-@app.route('/api/payoff')
+    def hover(event):
+        txt.set_text("ss")
+
+    def plotter():
+        y=0
+        plt.figure(figsize=(10,6))
+
+
+        for i in range (len(op_list)):
+            try:
+                contract=str(op_list[i]['contract'])  
+            except:
+                contract='1'
+                
+            if verbose:
+                label=contract+' '+str(abb[op_list[i]['tr_type']])+' '+str(abb[op_list[i]['op_type']])+' ST: '+str(op_list[i]['strike'])
+                sns.lineplot(x=x, y=y_list[i], label=label, alpha=0.5)
+            y+=np.array(y_list[i])
+        
+
+
+        # import pdb; pdb.set_trace()
+        plt.legend(loc='upper right')
+        plt.title("Multiple Options Plotter")
+        plt.fill_between(x, y, 0, alpha=0.2, where=y>y0, facecolor='green', interpolate=True)
+        plt.fill_between(x, y, 0, alpha=0.2, where=y<y0, facecolor='red', interpolate=True)
+        sns.lineplot(x=x, y=y, label='combined', alpha=1, color='k')
+        plt.axhline(color='k', linestyle='--')
+        plt.axvline(x=spot, color='r', linestyle='--', label='spot price')
+        plt.tight_layout()
+        
+        # output_file("toolbar.html")
+        if save==True:
+            plt.savefig(file)
+        mplcursors.cursor(hover=True).connect("add")
+        # for i in (y_list):
+        #     print(i)
+
+        if interactive:
+            # FIXME: take this plot show to a non-main thread and return the image from main thread
+            plt.show()
+        else:
+            # FIXME: API shall return something like this, an array of this
+            #  {
+            # "Change": -6.24,
+            # "Final": 1172.0,
+            # "StockPrice": 15663.0,
+            # "Today": 1162.8,
+            # "bes": 0.0
+            # },
+
+            # # # Save it to a temporary buffer.
+            buf = BytesIO()
+            plt.savefig(buf, format="png")
+            # Embed the result in the html output.
+            data = base64.b64encode(buf.getbuffer()).decode("ascii")
+            return f"<img src='data:image/png;base64,{data}'/>"
+            # return Response(output.getvalue(), mimetype='image/png')
+
+
+
+        
+        # fig = create_figure()
+        # # output = io.BytesIO()
+
+        # data = base64.b64encode(buf.getbuffer()).decode("ascii")
+        # FigureCanvas(fig).print_png(data)
+
+
+    return plotter()   
+
+
+    # df = DataFrame(
+    #     [("Alice", 163, 54),
+    #     ("Bob", 174, 67),
+    #     ("Charlie", 177, 73),
+    #     ("Diane", 168, 57)],
+    #     columns=["name", "height", "weight"])
+
+    # df.plot.scatter("height", "weight")
+    # mplcursors.cursor().connect(
+    #     "add", lambda sel: sel.annotation.set_text(df["name"][sel.target.index]))
+    # plt.show()
+
+@app.route('/api/payoff', methods=['GET', 'POST'])
 def opt_payoff():
-    op1={'op_type': 'c', 'strike': 215, 'tr_type': 's', 'op_pr': 7.63}
-    op2={'op_type': 'c', 'strike': 220, 'tr_type': 'b', 'op_pr': 5.35}
-    op3={'op_type': 'p', 'strike': 210, 'tr_type': 's', 'op_pr': 7.20}
-    op4={'op_type': 'p', 'strike': 205, 'tr_type': 'b', 'op_pr': 5.52}
-    op_list=[op1, op2, op3, op4]
-    return multi_plotter(spot=212.26,spot_range=10, op_list=op_list)
+    c = request.json
+    print(c['spot'])
+    return multi_plotter(spot=c['spot'],spot_range=10, op_list=c['legs'])
+    # spot_range=20, spot=100,
+    #             op_list=[{'op_type':'c','strike':110,'tr_type':'s','op_pr':2,'contract':1},
+    #             {'op_type':'p','strike':95,'tr_type':'s','op_pr':6,'contract':1}], 
+    #               save=False, file='fig.png'
 
     # return jsonify({"Flask":"Charts"})
