@@ -121,6 +121,9 @@ def multi_plotter(spot_range=20, spot=100,
         y_list.append(payoff_calculator(x, op_type, strike, op_pr, tr_type, contract))
     
 
+    def hover(event):
+        txt.set_text("ss")
+
     def plotter():
         y=0
         plt.figure(figsize=(10,6))
@@ -133,33 +136,24 @@ def multi_plotter(spot_range=20, spot=100,
                 contract='1'
                 
             label=contract+' '+str(abb[op_list[i]['tr_type']])+' '+str(abb[op_list[i]['op_type']])+' ST: '+str(op_list[i]['strike'])
-            sns.lineplot(x=x, y=y_list[i], label=label, alpha=0.5)
+            # sns.lineplot(x=x, y=y_list[i], label=label, alpha=0.5)
             y+=np.array(y_list[i])
         
-        sns.lineplot(x=x, y=y, label='combined', alpha=1, color='k')
-        plt.axhline(color='k', linestyle='--')
-        plt.axvline(x=spot, color='r', linestyle='--', label='spot price')
         
+
+
+        # import pdb; pdb.set_trace()
         plt.legend(loc='upper right')
         plt.title("Multiple Options Plotter")
         plt.fill_between(x, y, 0, alpha=0.2, where=y>y0, facecolor='green', interpolate=True)
         plt.fill_between(x, y, 0, alpha=0.2, where=y<y0, facecolor='red', interpolate=True)
+        sns.lineplot(x=x, y=y, label='combined', alpha=1, color='k')
+        plt.axhline(color='k', linestyle='--')
+        plt.axvline(x=spot, color='r', linestyle='--', label='spot price')
         plt.tight_layout()
         output_file("toolbar.html")
-
-        # source = ColumnDataSource(data=dict(
-        #     x=x
-        #     y=y,
-        #     desc=['A', 'b', 'C', 'd', 'E'],
-        # ))
-
-        plt.tooltips = [
-            ("(x,y)", "($x, $y)"),
-        ]
-
         if save==True:
             plt.savefig(file)
-
         plt.show()
 
 
